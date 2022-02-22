@@ -1,38 +1,195 @@
-//import { ApiGatewayToLambda } from '@aws-solutions-constructs/aws-apigateway-lambda';
-import * as apigwv2 from '@aws-cdk/aws-apigatewayv2-alpha';
-import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
-import { App, Stack, StackProps } from 'aws-cdk-lib';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
+import {
+  App,
+  Stack,
+  StackProps,
+  CfnOutput,
+  RemovalPolicy,
+  aws_apigateway as apigateway,
+  aws_dynamodb as dynamodb,
+  aws_iam as iam,
+} from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import { DynamoDBIntegration } from './lib/dynamoDBIntegration'
+import * as voteCreate from './templates/voteCreate';
+//import * as voteGet from './templates/voteGet';
+//import * as votesList from './templates/votesList';
+import * as voteUpdate from './templates/voteUpdate';
+import * as votesQuery from './templates/votesQuery';
+import * as viewUpdate from './templates/viewUpdate';
+import * as viewsQuery from './templates/viewsQuery';
+
 
 export class UsageTrackerStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps = {}) {
     super(scope, id, props);
 
-    const UserTrackerFN = new lambda.Function(this, 'UsageTracker', {
-      runtime: lambda.Runtime.PYTHON_3_9,
-      handler: 'tracer.handler',
-      code: lambda.Code.fromAsset('resources'),
+    const corsHeaders = [
+      'Content-Type',
+      'X-Amz-Date',
+      'Authorization',
+      'X-Api-Key',
+      'X-Referer',
+      'X-Dimension',
+      'X-Language',
+      'sec-ch-ua',
+      'sec-ch-ua-mobile',
+      'sec-ch-ua-platform',
+    ];
+    const corsOrigin = '*';
+
+
+    const table = new dynamodb.Table(this, 'VoteTable', {
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    const userTrackerIntegration = new HttpLambdaIntegration('userTrackerIntegration', UserTrackerFN);
+    //const powertoolsLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'powertoolsLayer', 'arn:aws:lambda:eu-west-1:017000801446:layer:AWSLambdaPowertoolsPython:9');
 
-    const httpApi = new apigwv2.HttpApi(this, 'HttpApi');
-
-    httpApi.addRoutes({
-      path: '/trace',
-      methods: [apigwv2.HttpMethod.GET],
-      integration: userTrackerIntegration,
-    });
-
-    // // define resources here...
-    // new ApiGatewayToLambda(this, 'ApiGatewayToLambdaPattern', {
-    //   lambdaFunctionProps: {
-    //     runtime: lambda.Runtime.PYTHON_3_9,
-    //     handler: 'tracer.handler',
-    //     code: lambda.Code.fromAsset('resources'),
+    // const VoteFN = new lambda.Function(this, 'Vote', {
+    //   runtime: lambda.Runtime.PYTHON_3_9,
+    //   layers: [powertoolsLayer],
+    //   handler: 'vote.handler',
+    //   code: lambda.Code.fromAsset('resources'),
+    //   environment: {
+    //     LOG_LEVEL: 'INFO',
+    //     POWERTOOLS_LOGGER_SAMPLE_RATE: '0.1',
+    //     POWERTOOLS_LOGGER_LOG_EVENT: 'true',
+    //     POWERTOOLS_METRICS_NAMESPACE: 'Vote',
+    //     POWERTOOLS_SERVICE_NAME: 'Vote-Tracker',
     //   },
     // });
+
+    const corsPreflight = {
+      allowHeaders: corsHeaders,
+      allowMethods: ['OPTIONS', 'GET', 'POST'],
+      allowCredentials: false,
+      allowOrigins: [corsOrigin],
+    };
+
+    const api = new apigateway.RestApi(this, 'voteapi', {
+      defaultCorsPreflightOptions: corsPreflight,
+      deployOptions: {
+        stageName: 'prod',
+        tracingEnabled: true,
+      },
+      cloudWatchRole: true,
+    });
+
+    const resourceCors = { defaultCorsPreflightOptions: corsPreflight };
+
+    const apiRole = new iam.Role(this, 'VoteAPIRole', {
+      assumedBy: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+    });
+
+    table.grantReadWriteData(apiRole);
+
+    const votes = api.root.addResource('votes', resourceCors);
+    //const vote_id = votes.addResource('{id}', resourceCors);
+    const vote = api.root.addResource('vote', resourceCors);
+    const r_voteUp = vote.addResource('up', resourceCors);
+    const r_voteDown = vote.addResource('down', resourceCors);
+    const views = api.root.addResource('views', resourceCors);
+    const view = api.root.addResource('view', resourceCors);
+
+    new DynamoDBIntegration(this,'votesList', {
+      method: 'GET',
+      action: 'Query',
+      requestTemplate: votesQuery.request(table.tableName),
+      responseTemplate: votesQuery.response,
+      apiRole: apiRole,
+      resource: votes,
+      cors: corsPreflight,
+    });
+
+    new DynamoDBIntegration(this,'votesCreateIntegration', {
+      method: 'POST',
+      action: 'PutItem',
+      requestTemplate: voteCreate.request(table.tableName),
+      responseTemplate: voteCreate.response,
+      apiRole: apiRole,
+      resource: votes,
+      cors: corsPreflight,
+    });
+
+
+    new DynamoDBIntegration(this,'voteUpPostIntegration', {
+      method: 'POST',
+      action: 'UpdateItem',
+      requestTemplate: voteUpdate.request(table.tableName, 1),
+      responseTemplate: voteUpdate.response,
+      apiRole: apiRole,
+      resource: r_voteUp,
+      cors: corsPreflight,
+    });
+
+    new DynamoDBIntegration(this,'voteUpIntegration', {
+      method: 'GET',
+      action: 'UpdateItem',
+      requestTemplate: voteUpdate.request(table.tableName, 1),
+      responseTemplate: voteUpdate.response,
+      apiRole: apiRole,
+      resource: r_voteUp,
+      cors: corsPreflight,
+    });
+
+    new DynamoDBIntegration(this,'voteDownIntegration', {
+      method: 'GET',
+      action: 'UpdateItem',
+      requestTemplate: voteUpdate.request(table.tableName, -1),
+      responseTemplate: voteUpdate.response,
+      apiRole: apiRole,
+      resource: r_voteDown,
+      cors: corsPreflight,
+    });
+
+    new DynamoDBIntegration(this,'voteDownPostIntegration', {
+      method: 'POST',
+      action: 'UpdateItem',
+      requestTemplate: voteUpdate.request(table.tableName, -1),
+      responseTemplate: voteUpdate.response,
+      apiRole: apiRole,
+      resource: r_voteDown,
+      cors: corsPreflight,
+    });
+
+
+    new DynamoDBIntegration(this,'viewsListIntegration', {
+      method: 'GET',
+      action: 'Query',
+      requestTemplate: viewsQuery.request(table.tableName),
+      responseTemplate: viewsQuery.response,
+      apiRole: apiRole,
+      resource: views,
+      cors: corsPreflight,
+    });
+
+    new DynamoDBIntegration(this,'viewIntegration', {
+      method: 'GET',
+      action: 'viewIntegration',
+      requestTemplate: viewUpdate.request(table.tableName),
+      responseTemplate: viewUpdate.response,
+      apiRole: apiRole,
+      resource: view,
+      cors: corsPreflight,
+    });
+
+
+
+
+    // 👇 create an Output
+    new CfnOutput(this, 'apiUrl', {
+      value: api.url,
+      description: 'api url',
+      exportName: 'apiUrl',
+    });
+    new CfnOutput(this, 'table', {
+      value: table.tableArn,
+      description: 'table arn',
+      exportName: 'tableArn',
+    });
   }
 }
 

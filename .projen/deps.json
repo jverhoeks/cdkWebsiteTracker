@@ -81,7 +81,11 @@
       "type": "build"
     },
     {
-      "name": "@aws-solutions-constructs/aws-apigateway-lambda",
+      "name": "@aws-cdk/aws-iam",
+      "type": "runtime"
+    },
+    {
+      "name": "@aws-cdk/aws-logs",
       "type": "runtime"
     },
     {
