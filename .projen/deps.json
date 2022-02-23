@@ -81,16 +81,12 @@
       "type": "build"
     },
     {
-      "name": "@aws-cdk/aws-iam",
-      "type": "runtime"
-    },
-    {
-      "name": "@aws-cdk/aws-logs",
-      "type": "runtime"
-    },
-    {
       "name": "aws-cdk-lib",
       "version": "^2.1.0",
+      "type": "runtime"
+    },
+    {
+      "name": "aws-sdk",
       "type": "runtime"
     },
     {

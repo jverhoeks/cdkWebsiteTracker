@@ -62,8 +62,7 @@ export class DynamoDBIntegration extends Construct {
           'method.response.header.Access-Control-Allow-Origin': true,
           'method.response.header.Access-Control-Allow-Methods': true,
         },
-      },
-      ],
+      }],
     });
   }
 }

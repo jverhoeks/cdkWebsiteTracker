@@ -1,6 +1,6 @@
-import { Integer } from "aws-sdk/clients/appstream";
+import { Integer } from 'aws-sdk/clients/appstream';
 
-export const request = (tableName: string,value:Integer): string => `
+export const request = (tableName: string, value:Integer): string => `
 #set ($site_pre = "SITE#")
 #set ($vote_pre = "VOTE#")
 { 
