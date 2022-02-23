@@ -9,15 +9,15 @@ import {
   aws_iam as iam,
 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { DynamoDBIntegration } from './lib/dynamoDBIntegration'
+import { DynamoDBIntegration } from './lib/dynamoDBIntegration';
+import * as logCreate from './templates/logCreate';
+import * as viewsQuery from './templates/viewsQuery';
+import * as viewUpdate from './templates/viewUpdate';
 import * as voteCreate from './templates/voteCreate';
 //import * as voteGet from './templates/voteGet';
 //import * as votesList from './templates/votesList';
-import * as voteUpdate from './templates/voteUpdate';
 import * as votesQuery from './templates/votesQuery';
-import * as viewUpdate from './templates/viewUpdate';
-import * as viewsQuery from './templates/viewsQuery';
-
+import * as voteUpdate from './templates/voteUpdate';
 
 export class UsageTrackerStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps = {}) {
@@ -86,36 +86,37 @@ export class UsageTrackerStack extends Stack {
 
     table.grantReadWriteData(apiRole);
 
-    const votes = api.root.addResource('votes', resourceCors);
+    const r_votes = api.root.addResource('votes', resourceCors);
     //const vote_id = votes.addResource('{id}', resourceCors);
-    const vote = api.root.addResource('vote', resourceCors);
-    const r_voteUp = vote.addResource('up', resourceCors);
-    const r_voteDown = vote.addResource('down', resourceCors);
-    const views = api.root.addResource('views', resourceCors);
-    const view = api.root.addResource('view', resourceCors);
+    const r_vote = api.root.addResource('vote', resourceCors);
+    const r_voteUp = r_vote.addResource('up', resourceCors);
+    const r_voteDown = r_vote.addResource('down', resourceCors);
+    const r_views = api.root.addResource('views', resourceCors);
+    const r_view = api.root.addResource('view', resourceCors);
+    const r_log = api.root.addResource('log', resourceCors);
 
-    new DynamoDBIntegration(this,'votesList', {
+    new DynamoDBIntegration(this, 'votesList', {
       method: 'GET',
       action: 'Query',
       requestTemplate: votesQuery.request(table.tableName),
       responseTemplate: votesQuery.response,
       apiRole: apiRole,
-      resource: votes,
+      resource: r_votes,
       cors: corsPreflight,
     });
 
-    new DynamoDBIntegration(this,'votesCreateIntegration', {
+    new DynamoDBIntegration(this, 'votesCreateIntegration', {
       method: 'POST',
       action: 'PutItem',
       requestTemplate: voteCreate.request(table.tableName),
       responseTemplate: voteCreate.response,
       apiRole: apiRole,
-      resource: votes,
+      resource: r_votes,
       cors: corsPreflight,
     });
 
 
-    new DynamoDBIntegration(this,'voteUpPostIntegration', {
+    new DynamoDBIntegration(this, 'voteUpPostIntegration', {
       method: 'POST',
       action: 'UpdateItem',
       requestTemplate: voteUpdate.request(table.tableName, 1),
@@ -125,7 +126,7 @@ export class UsageTrackerStack extends Stack {
       cors: corsPreflight,
     });
 
-    new DynamoDBIntegration(this,'voteUpIntegration', {
+    new DynamoDBIntegration(this, 'voteUpIntegration', {
       method: 'GET',
       action: 'UpdateItem',
       requestTemplate: voteUpdate.request(table.tableName, 1),
@@ -135,7 +136,7 @@ export class UsageTrackerStack extends Stack {
       cors: corsPreflight,
     });
 
-    new DynamoDBIntegration(this,'voteDownIntegration', {
+    new DynamoDBIntegration(this, 'voteDownIntegration', {
       method: 'GET',
       action: 'UpdateItem',
       requestTemplate: voteUpdate.request(table.tableName, -1),
@@ -145,7 +146,7 @@ export class UsageTrackerStack extends Stack {
       cors: corsPreflight,
     });
 
-    new DynamoDBIntegration(this,'voteDownPostIntegration', {
+    new DynamoDBIntegration(this, 'voteDownPostIntegration', {
       method: 'POST',
       action: 'UpdateItem',
       requestTemplate: voteUpdate.request(table.tableName, -1),
@@ -156,28 +157,35 @@ export class UsageTrackerStack extends Stack {
     });
 
 
-    new DynamoDBIntegration(this,'viewsListIntegration', {
+    new DynamoDBIntegration(this, 'viewsListIntegration', {
       method: 'GET',
       action: 'Query',
       requestTemplate: viewsQuery.request(table.tableName),
       responseTemplate: viewsQuery.response,
       apiRole: apiRole,
-      resource: views,
+      resource: r_views,
       cors: corsPreflight,
     });
 
-    new DynamoDBIntegration(this,'viewIntegration', {
+    new DynamoDBIntegration(this, 'viewIntegration', {
       method: 'GET',
-      action: 'viewIntegration',
+      action: 'UpdateItem',
       requestTemplate: viewUpdate.request(table.tableName),
       responseTemplate: viewUpdate.response,
       apiRole: apiRole,
-      resource: view,
+      resource: r_view,
       cors: corsPreflight,
     });
 
-
-
+    new DynamoDBIntegration(this, 'logIntegration', {
+      method: 'GET',
+      action: 'PutItem',
+      requestTemplate: logCreate.request(table.tableName),
+      responseTemplate: logCreate.response,
+      apiRole: apiRole,
+      resource: r_log,
+      cors: corsPreflight,
+    });
 
     // 👇 create an Output
     new CfnOutput(this, 'apiUrl', {

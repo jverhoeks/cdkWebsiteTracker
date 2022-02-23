@@ -1,5 +1,4 @@
 import {
-
   aws_apigateway as apigateway,
   aws_iam as iam,
 } from 'aws-cdk-lib';
@@ -21,9 +20,10 @@ type DynamoDBIntegrationProps = {
   };
 };
 
+// Dynamodb Integration for API Gateway Rest API.
 export class DynamoDBIntegration extends Construct {
   public readonly integration: apigateway.AwsIntegration;
-  
+
   constructor(scope: Construct, id: string, props: DynamoDBIntegrationProps) {
     super(scope, id);
 
@@ -55,13 +55,13 @@ export class DynamoDBIntegration extends Construct {
 
 
     props.resource.addMethod(props.method, this.integration, {
-      methodResponses: [{ 
-        statusCode: '200',       
+      methodResponses: [{
+        statusCode: '200',
         responseParameters: {
           'method.response.header.Access-Control-Allow-Headers': true,
           'method.response.header.Access-Control-Allow-Origin': true,
           'method.response.header.Access-Control-Allow-Methods': true,
-        }, 
+        },
       },
       ],
     });
